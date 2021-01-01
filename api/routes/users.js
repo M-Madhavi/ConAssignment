@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const checkAuth=require("../middleware/check-auth")
 
 
 const User = require("../models/user");
@@ -62,7 +63,7 @@ router.post("/signup", (req, res, next) => {
                             UserName:  req.body.UserName,
                             Role:req.body.Role,
                             CreatedDate: new Date().toISOString(),
-                            UpdatedDate:new Date().toISOString
+                            UpdatedDate:new Date().toISOString()
 
                         });
                         user
@@ -111,33 +112,43 @@ router.get("/:userId", (req, res, next) => {
             res.status(500).json({ error: err });
         });
 });
-/*
-router.get('/users/filter', function(req, res, next) {
-    const MRole = req.params.Role;
-    User.findById(MRole)
-        .select('_id UserName password email CreatedDate UpdatedDate Role')
+//sort
+router.get('/users/filter', async(req, res, next) => {
+    const role = req.params.Role;
 
-    function search(MRole) {
-  return function(element) {
-    for(var i in MRole) {
-      if(MRole[i] != element[i]) {
-        return false;
+    const match ={}
+    const sort={}
+     if(req.query.role){
+          match.role=req.query.role==='true'
       }
+      if(req.query.sortBy){
+        const str = req.query.sortBy.split(':')
+        sort[str[0]] = str[1] === 'desc' ? -1:1
     }
-    return true;
-  }
-}
+    try {
+         const users = await Users.find({role:req.params.Role})
+        await req.User.populate({
+            path:'users',
+            match,
+            options:{
+                limit:parseInt(req.query.limit),
+                skip:parseInt(req.query.skip),
 
-exports.search = function(MRole) {
-  //return users.filter(search(MRole));
+                  sort:{
+                      Role:admin||supetadmin||employee,
+                      CreatedDate:1,
 
-return res.json({ users: users.search(req.MRole) })
-}
-      
-      
-    ;
+
+                  }
+            }
+        }).execPopulate();
+        res.status(200).send(req.user.users)
+    }catch(e) {
+        res.status(400).send(e.message)
+    }
+
   });
-*/
+
 
 router.post("/login", (req, res, next) => {
     User.find({ email: req.body.email })
@@ -198,5 +209,31 @@ router.delete("/:userId", (req, res, next) => {
             });
         });
 });
+router.patch("/:userId", checkAuth,(req, res, next) => {
+    const id = req.params.userId;
+    const updateOps = {};
+
+    for (const ops of req.body) {
+        updateOps[ops.propName] = ops.value;
+    }
+    Product.update({ _id: id }, { $set: updateOps })
+        .exec()
+        .then(result => {
+
+            res.status(200).json({
+                message: 'User updated',
+                UpdatedDate:new Date().toISOString()
+
+                
+            });
+        })
+        .catch(err => {
+            console.log(err);
+            res.status(500).json({
+                error: err
+            });
+        });
+});
+
 
 module.exports = router; 
